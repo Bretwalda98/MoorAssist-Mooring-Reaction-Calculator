@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MoorAssist — Mooring Reaction Calculator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html,body{height:100%} .card{border-radius:1rem; box-shadow:0 10px 20px rgba(0,0,0,.08)}
+  @media print{.no-print{display:none!important}.card{box-shadow:none;border:1px solid #999}}
+  .mono{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}
+  svg text{font-size:12px}
+</style>
+</head>
+<body class="bg-zinc-50 text-zinc-900">
+  <div class="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+    <!-- Header -->
+    <header class="flex items-center justify-between">
+      <h1 class="text-2xl font-semibold">MoorAssist <span class="text-zinc-500">— Mooring Reaction Calculator</span></h1>
+      <div class="flex gap-2">
+        <button id="helpBtn" class="no-print px-3 py-2 rounded-lg bg-sky-600 text-white">Help</button>
+        <button id="printBtn" class="no-print px-3 py-2 rounded-lg bg-zinc-900 text-white">Print / Save PDF</button>
+      </div>
+    </header>
+
+    <!-- Layout -->
+    <div class="grid md:grid-cols-2 gap-6">
+      <!-- Left: Inputs -->
+      <section class="card bg-white p-4 md:p-6 space-y-6">
+        <!-- Barge -->
+        <div>
+          <h2 class="font-semibold mb-2">Barge & Environment</h2>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="col-span-2 flex items-center gap-2">
+              <span class="w-44">Load in/out over</span>
+              <select id="over" class="w-full border rounded px-2 py-1">
+                <option>Bow or Stern</option>
+                <option>Side</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-2"><span class="w-36">Length L [m]</span><input id="Lbarge" type="number" step="0.1" class="w-full border rounded px-2 py-1" value="100"></label>
+            <label class="flex items-center gap-2"><span class="w-36">Breadth B [m]</span><input id="Bbarge" type="number" step="0.1" class="w-full border rounded px-2 py-1" value="25"></label>
+            <label class="flex items-center gap-2"><span class="w-36">Depth [m]</span><input id="Depth" type="number" step="0.1" class="w-full border rounded px-2 py-1" value="7.5"></label>
+            <label class="flex items-center gap-2"><span class="w-36">Draft [m]</span><input id="Draft" type="number" step="0.1" class="w-full border rounded px-2 py-1" value="5"></label>
+            <label class="flex items-center gap-2"><span class="w-36">Distance to quay [m]</span><input id="DistQuay" type="number" step="0.1" class="w-full border rounded px-2 py-1" value="10"></label>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mt-3">
+            <label class="flex items-center gap-2"><span class="w-36">Beaufort</span>
+              <select id="beaufort" class="w-full border rounded px-2 py-1">
+                <option>0</option><option>1</option><option>2</option><option>3</option><option>4</option>
+                <option>5</option><option selected>6</option><option>7</option><option>8</option><option>9</option>
+                <option>10</option><option>11</option><option>12</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-2"><span class="w-36">Water speed [m/s]</span><input id="WaterSpeed" type="number" step="0.1" class="w-full border rounded px-2 py-1" value="0.5"></label>
+            <label class="flex items-center gap-2"><span class="w-36">Water density [kg/m³]</span><input id="WaterRho" type="number" step="1" class="w-full border rounded px-2 py-1" value="1025"></label>
+          </div>
+          <p class="text-xs text-zinc-500 mt-1">
+            Wind profile factor uses <span class="mono">1 + 0.137·ln(0.5·H/10)</span> with H = Depth − Draft. Drag coeffs: wind on hull = 1.2, current = 1.2.
+          </p>
+        </div>
+
+        <!-- Deck items -->
+        <div>
+          <h2 class="font-semibold mb-2">Deck Items (projected)</h2>
+          <div class="grid grid-cols-3 gap-2 text-sm">
+            <div class="font-medium text-zinc-500">Item</div>
+            <div class="font-medium text-zinc-500">Area [m²]</div>
+            <div class="font-medium text-zinc-500">Shape coef [-]</div>
+
+            <div class="py-1">1</div><input id="A1" type="number" step="0.1" value="100" class="border rounded px-2 py-1"><input id="Cd1" type="number" step="0.1" value="1" class="border rounded px-2 py-1">
+            <div class="py-1">2</div><input id="A2" type="number" step="0.1" value="0" class="border rounded px-2 py-1"><input id="Cd2" type="number" step="0.1" value="1" class="border rounded px-2 py-1">
+            <div class="py-1">3</div><input id="A3" type="number" step="0.1" value="0" class="border rounded px-2 py-1"><input id="Cd3" type="number" step="0.1" value="1" class="border rounded px-2 py-1">
+            <div class="py-1">4</div><input id="A4" type="number" step="0.1" value="0" class="border rounded px-2 py-1"><input id="Cd4" type="number" step="0.1" value="1" class="border rounded px-2 py-1">
+          </div>
+        </div>
+
+        <!-- Bollards on barge -->
+        <div>
+          <h2 class="font-semibold mb-2">Bollard Positions on Barge (plan view)</h2>
+          <div class="grid grid-cols-4 gap-2 text-sm">
+            <div></div><div class="font-medium text-zinc-500">X [m] (± from CL)</div><div class="font-medium text-zinc-500">Y [m] (from stern)</div><div></div>
+
+            <div class="py-1">Bollard 1</div><input id="X1" type="number" step="0.1" value="15" class="border rounded px-2 py-1"><input id="Y1" type="number" step="0.1" value="17.5" class="border rounded px-2 py-1"><div></div>
+            <div class="py-1">Bollard 2</div><input id="X2" type="number" step="0.1" value="15" class="border rounded px-2 py-1"><input id="Y2" type="number" step="0.1" value="17.5" class="border rounded px-2 py-1"><div></div>
+            <div class="py-1">Bollard 3</div><input id="X3" type="number" step="0.1" value="15" class="border rounded px-2 py-1"><input id="Y3" type="number" step="0.1" value="75" class="border rounded px-2 py-1"><div></div>
+            <div class="py-1">Bollard 4</div><input id="X4" type="number" step="0.1" value="15" class="border rounded px-2 py-1"><input id="Y4" type="number" step="0.1" value="75" class="border rounded px-2 py-1"><div></div>
+          </div>
+        </div>
+
+        <!-- Mooring geometry -->
+        <div>
+          <h2 class="font-semibold mb-2">Mooring Geometry to Quay</h2>
+          <p class="text-xs text-zinc-500 mb-1">L = longitudinal run along quay from the bollard’s Y-position; B = along-quay projection (used for the along-quay force component).</p>
+          <div class="grid grid-cols-3 gap-2 text-sm">
+            <div class="font-medium text-zinc-500">Line</div>
+            <div class="font-medium text-zinc-500">L-i [m]</div>
+            <div class="font-medium text-zinc-500">B-i [m]</div>
+
+            <div class="py-1">1 (to port)</div><input id="L1" type="number" step="0.1" value="25" class="border rounded px-2 py-1"><input id="B1" type="number" step="0.1" value="30" class="border rounded px-2 py-1">
+            <div class="py-1">2 (to stbd)</div><input id="L2" type="number" step="0.1" value="25" class="border rounded px-2 py-1"><input id="B2" type="number" step="0.1" value="30" class="border rounded px-2 py-1">
+            <div class="py-1">3 (to port)</div><input id="L3" type="number" step="0.1" value="80" class="border rounded px-2 py-1"><input id="B3" type="number" step="0.1" value="85" class="border rounded px-2 py-1">
+            <div class="py-1">4 (to stbd)</div><input id="L4" type="number" step="0.1" value="80" class="border rounded px-2 py-1"><input id="B4" type="number" step="0.1" value="85" class="border rounded px-2 py-1">
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Diagram + Results -->
+      <section class="space-y-6">
+        <!-- Diagram -->
+        <div class="card bg-white p-4 md:p-6">
+          <div class="flex items-center justify-between">
+            <h2 class="font-semibold">Mooring Diagram (plan view)</h2>
+            <div class="text-xs text-zinc-500">Not to scale</div>
+          </div>
+          <svg id="viz" viewBox="0 0 900 520" class="w-full h-[360px] mt-3 border rounded"></svg>
+          <p class="text-xs text-zinc-500 mt-2">
+            Quay at bottom. Barge offset equals “Distance to quay”. Lines 1 &amp; 3 drawn to port (−X), 2 &amp; 4 to starboard (+X).
+          </p>
+        </div>
+
+        <!-- Results -->
+        <div class="card bg-white p-4 md:p-6">
+          <h2 class="font-semibold mb-2">Results</h2>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div class="font-medium text-zinc-500">Wind pressure (kg/m²)</div><div id="windPressure">–</div>
+            <div class="font-medium text-zinc-500">Wind profile factor [−]</div><div id="wpf">–</div>
+            <div class="font-medium text-zinc-500">Wind on hull Q<sub>hull</sub> [kN]</div><div id="Qhull">–</div>
+            <div class="font-medium text-zinc-500">Deck items Q<sub>deck</sub> [kN]</div><div id="Qdeck">–</div>
+            <div class="font-medium text-zinc-500">Current force Q<sub>cur</sub> [kN]</div><div id="Qcur">–</div>
+            <div class="font-medium text-zinc-500">Total horizontal force ΣQ [kN]</div><div id="Qsum" class="font-medium">–</div>
+          </div>
+
+          <hr class="my-3">
+
+          <div class="grid grid-cols-3 gap-2 text-sm">
+            <div class="font-medium text-zinc-500">Pair sharing</div>
+            <div class="font-medium text-zinc-500">F<sub>hor</sub> (1/3) [kN]</div>
+            <div class="font-medium text-zinc-500">F<sub>hor</sub> (2/4) [kN]</div>
+            <div>via moments about Y1–Y3</div><div id="F13">–</div><div id="F24">–</div>
+          </div>
+
+          <hr class="my-3">
+
+          <div class="grid grid-cols-4 gap-2 text-sm">
+            <div class="font-medium text-zinc-500">Line</div>
+            <div class="font-medium text-zinc-500">Along-quay share [kN]</div>
+            <div class="font-medium text-zinc-500">Tension [kN]</div>
+            <div class="font-medium text-zinc-500">Util. vs 10-ton SWL</div>
+
+            <div>1</div><div id="F1">–</div><div id="R1" class="font-medium">–</div><div id="U1">–</div>
+            <div>2</div><div id="F2">–</div><div id="R2" class="font-medium">–</div><div id="U2">–</div>
+            <div>3</div><div id="F3">–</div><div id="R3" class="font-medium">–</div><div id="U3">–</div>
+            <div>4</div><div id="F4">–</div><div id="R4" class="font-medium">–</div><div id="U4">–</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="fixed inset-0 bg-black/40 items-center justify-center hidden">
+    <div class="bg-white max-w-3xl w-[92%] md:w-[48rem] max-h-[85vh] overflow-y-auto rounded-2xl shadow-xl p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-xl font-semibold">Help — How to use MoorAssist</h3>
+        <button id="helpClose" class="px-3 py-1 rounded-lg bg-zinc-900 text-white">Close</button>
+      </div>
+      <div class="prose prose-zinc max-w-none">
+        <h4>1) What this tool does</h4>
+        <ul>
+          <li>Builds a plan-view mooring arrangement with four lines (1–4) and draws it to scale.</li>
+          <li>Computes horizontal environmental loads from wind, deck items, and current.</li>
+          <li>Distributes the total horizontal load to the forward and aft mooring pairs using moment balance about their longitudinal positions.</li>
+          <li>Back-calculates each line’s tension from its along-quay component and geometry.</li>
+        </ul>
+
+        <h4>2) Quick start</h4>
+        <ol>
+          <li>Enter barge geometry: <b>L</b>, <b>B</b>, <b>Depth</b>, <b>Draft</b>, and <b>Distance to quay</b>.</li>
+          <li>Select the operation orientation (<b>Bow or Stern</b> vs <b>Side</b>) — this sets the exposed length for wind/current.</li>
+          <li>Choose <b>Beaufort</b> and, if relevant, enter <b>Water speed</b> and <b>Water density</b>.</li>
+          <li>Add any deck items as projected areas with a shape coefficient (typically 0.8–1.3).</li>
+          <li>Set bollard positions on the barge: X is ± from centreline, Y is measured from stern.</li>
+          <li>For each line, give the along-quay projection <b>B-i</b> and longitudinal run <b>L-i</b> to the quay point.</li>
+        </ol>
+
+        <h4>3) Diagram</h4>
+        <ul>
+          <li>Quay is the bottom baseline. The barge sits a fixed offset above it equal to <b>Distance to quay</b>.</li>
+          <li>Lines 1 &amp; 3 run to port (negative X); 2 &amp; 4 run to starboard (positive X).</li>
+          <li>Bollard labels (B1–B4) are drawn at the entered X/Y positions on the hull.</li>
+        </ul>
+
+        <h4>4) Calculations (concise)</h4>
+        <ul>
+          <li><b>Wind pressure</b> from Beaufort: lookup (kg/m²).</li>
+          <li><b>Wind profile factor</b> for height above water <span class="mono">H = Depth − Draft</span>:
+            <span class="mono">WPF = 1 + 0.137·ln(0.5·H/10)</span>.</li>
+          <li><b>Wind on hull</b> (kN): <span class="mono">Q_hull = N·H·C_d·WPF·(p/1000)</span>,
+            where <span class="mono">N = L</span> for bow/stern operations or <span class="mono">N = B</span> for side operations, <span class="mono">C_d = 1.2</span>, and <span class="mono">p</span> is the Beaufort pressure.</li>
+          <li><b>Deck items</b> (kN): <span class="mono">Q_deck = (Σ C_d,i·p·A_i)·WPF/1000</span>.</li>
+          <li><b>Current</b> (kN): <span class="mono">Q_cur = N·Draft·0.5·ρ·C_d·v² / (1000·9.81)</span> with <span class="mono">C_d = 1.2</span>.</li>
+          <li><b>Total</b>: <span class="mono">ΣQ = Q_hull + Q_deck + Q_cur</span>.</li>
+          <li><b>Pair sharing</b> by moments about each pair:
+            <div class="mono">F₃ = M₁₃ / (Y₃ − Y₁), &nbsp; F₁ = ΣQ − F₃</div>
+            <div class="mono">F₄ = M₂₄ / (Y₄ − Y₂), &nbsp; F₂ = ΣQ − F₄</div>
+            where <span class="mono">M₁₃</span> and <span class="mono">M₂₄</span> are the sums of force×arm to each pair.</li>
+          <li><b>Line tension</b> from along-quay component:
+            <span class="mono">T_i = F_i · √(L_i² + B_i²) / B_i</span>.</li>
+          <li><b>Utilisation</b>: shown versus an indicative 10-ton SWL (≈ 98.1 kN).</li>
+        </ul>
+
+        <h4>5) Tips</h4>
+        <ul>
+          <li>Check signs and units: X is ± from centreline (starboard positive), Y from stern (m).</li>
+          <li>Longer <b>B</b> (more along-quay) reduces the geometric amplification on tension.</li>
+          <li>If <b>B</b> is very small, tension grows sharply — confirm arrangement or increase angle.</li>
+        </ul>
+
+        <h4>6) Assumptions</h4>
+        <ul>
+          <li>Quasi-static balance in plan (heave/roll/pitch not modelled).</li>
+          <li>Uniform wind/current across the exposed areas with constant coefficients.</li>
+          <li>No line elasticity, friction at fairleads, or snatch effects.</li>
+        </ul>
+
+        <h4>7) Output interpretation</h4>
+        <ul>
+          <li><b>F<sub>hor</sub> (1/3) and (2/4)</b> are the horizontal shares sent to each pair.</li>
+          <li><b>Tension</b> is the resulting line load from its geometry.</li>
+          <li><b>Utilisation</b> is for quick screening only—verify against actual line MBL/SWL and factors.</li>
+        </ul>
+
+        <h4>8) Safety note</h4>
+        <p>Use conservative inputs and verify arrangements against site constraints, line ratings, and local procedures. Dynamic effects, surge, and berthing loads may govern in practice.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* --------------------------- Model & constants --------------------------- */
+const windPressureKgPerM2 = {
+  0:0, 1:0.14, 2:0.68, 3:1.82, 4:3.90, 5:7.10, 6:11.8, 7:18.2, 8:26.7, 9:37.1, 10:50.2, 11:66.2, 12:110
+};
+const clamp = (x,min,max)=>Math.max(min,Math.min(max,x));
+const byId = id => document.getElementById(id);
+const num = id => parseFloat(byId(id).value||0);
+
+/* Wind profile factor for height H above water (m) */
+function windProfileFactor(H){
+  const arg = 0.5*(H/10);    // simple log profile factor
+  return 1 + 0.137*Math.log(Math.max(arg, 0.01));
+}
+
+/* Draw helper */
+function line(svg,x1,y1,x2,y2,opts={}){
+  const el = document.createElementNS("http://www.w3.org/2000/svg","line");
+  el.setAttribute("x1",x1); el.setAttribute("y1",y1);
+  el.setAttribute("x2",x2); el.setAttribute("y2",y2);
+  el.setAttribute("stroke",opts.stroke||"#222");
+  el.setAttribute("stroke-width",opts.w||2);
+  el.setAttribute("stroke-dasharray",opts.dash||"");
+  svg.appendChild(el);
+  return el;
+}
+function circle(svg,cx,cy,r,opts={}){
+  const el = document.createElementNS("http://www.w3.org/2000/svg","circle");
+  el.setAttribute("cx",cx); el.setAttribute("cy",cy); el.setAttribute("r",r);
+  el.setAttribute("fill",opts.fill||"#fff"); el.setAttribute("stroke",opts.stroke||"#111"); el.setAttribute("stroke-width",opts.w||2);
+  svg.appendChild(el); return el;
+}
+function text(svg,x,y,t,opts={}){
+  const el = document.createElementNS("http://www.w3.org/2000/svg","text");
+  el.setAttribute("x",x); el.setAttribute("y",y);
+  el.setAttribute("fill",opts.fill||"#111");
+  el.textContent = t; svg.appendChild(el); return el;
+}
+
+/* ------------------------------ Calculator ------------------------------ */
+function calc(){
+  // Inputs
+  const L = num("Lbarge"), B = num("Bbarge"), Depth = num("Depth"), Draft = num("Draft");
+  const over = byId("over").value;               // "Bow or Stern" or "Side"
+  const DistQuay = num("DistQuay");
+  const beaufort = parseInt(byId("beaufort").value,10);
+  const wp = windPressureKgPerM2[beaufort] ?? 0; // kg/m2
+  const vWater = num("WaterSpeed"), rhoW = num("WaterRho");
+
+  // Deck items
+  const A = [0,num("A1"),num("A2"),num("A3"),num("A4")];
+  const Cd= [0,num("Cd1"),num("Cd2"),num("Cd3"),num("Cd4")];
+
+  // Bollards (m)
+  const X=[0,num("X1"),num("X2"),num("X3"),num("X4")];
+  const Y=[0,num("Y1"),num("Y2"),num("Y3"),num("Y4")];
+
+  // Mooring geometry (plan)
+  const Lrun=[0,num("L1"),num("L2"),num("L3"),num("L4")]; // longitudinal along quay
+  const Bproj=[0,num("B1"),num("B2"),num("B3"),num("B4")]; // along-quay projection
+
+  // Helpers
+  const H = Depth - Draft;                       // height above water
+  const WPF = windProfileFactor(H);
+  const CdHull = 1.2, CdCur = 1.2;
+
+  // Characteristic side length for wind on hull: depends on orientation
+  const N35 = (over === "Bow or Stern") ? L : B;   // exposed length
+  // Wind on hull (kN)
+  const Qhull = N35 * H * (1.2) * WPF * (wp/1000); // (kg/m2 -> kN/m2) via /1000
+  // Wind on deck items (kN)
+  const Qdeck = (Cd[1]*wp*A[1] + Cd[2]*wp*A[2] + Cd[3]*wp*A[3] + Cd[4]*wp*A[4]) * WPF / 1000;
+  // Current on underwater area (kN)
+  const Qcur = N35 * Draft * 0.5 * rhoW * CdCur * (vWater**2) / (1000*9.81);
+
+  const Qsum = Qhull + Qdeck + Qcur;
+
+  // Arms to mooring pairs (moments about Y1 and Y2)
+  const armHull1 = (N35/2) - Y[1], armHull2 = (N35/2) - Y[2];
+  const armCur1  = armHull1,       armCur2  = armHull2;
+  const armItem1 = DistQuay - Y[1], armItem2 = DistQuay - Y[2];
+
+  // Moments about pair-1/3 and pair-2/4
+  const M13 = Qhull*armHull1 + Qdeck*armItem1 + Qcur*armCur1;
+  const M24 = Qhull*armHull2 + Qdeck*armItem2 + Qcur*armCur2;
+
+  // Force sharing to each pair from total horizontal (ΣQ) using lever arms
+  // F3 = M13 / (Y3 - Y1) ; F1 = ΣQ - F3
+  // F4 = M24 / (Y4 - Y2) ; F2 = ΣQ - F4
+  const F3 = M13 / Math.max(Y[3]-Y[1], 1e-6);
+  const F4 = M24 / Math.max(Y[4]-Y[2], 1e-6);
+  const F1 = Qsum - F3;
+  const F2 = Qsum - F4;
+
+  // Line tensions from along-quay component:
+  // T_i = F_i * sqrt(L_i^2 + B_i^2) / B_i
+  function lineT(F,Bi,Li){ return F * Math.sqrt(Li*Li + Bi*Bi) / Math.max(Bi,1e-6); }
+  const R1 = lineT(F1,Bproj[1],Lrun[1]);
+  const R2 = lineT(F2,Bproj[2],Lrun[2]);
+  const R3 = lineT(F3,Bproj[3],Lrun[3]);
+  const R4 = lineT(F4,Bproj[4],Lrun[4]);
+
+  // Outputs
+  byId("windPressure").textContent = wp.toFixed(2);
+  byId("wpf").textContent = WPF.toFixed(3);
+  byId("Qhull").textContent = Qhull.toFixed(3);
+  byId("Qdeck").textContent = Qdeck.toFixed(3);
+  byId("Qcur").textContent  = Qcur.toFixed(3);
+  byId("Qsum").textContent  = Qsum.toFixed(3);
+
+  byId("F13").textContent = F3.toFixed(3);
+  byId("F24").textContent = F4.toFixed(3);
+
+  byId("F1").textContent = F1.toFixed(3);
+  byId("F2").textContent = F2.toFixed(3);
+  byId("F3").textContent = F3.toFixed(3);
+  byId("F4").textContent = F4.toFixed(3);
+
+  byId("R1").textContent = R1.toFixed(3);
+  byId("R2").textContent = R2.toFixed(3);
+  byId("R3").textContent = R3.toFixed(3);
+  byId("R4").textContent = R4.toFixed(3);
+
+  const swl = 98.1; // 10-ton SWL ~ 98.1 kN (indicative)
+  function util(R){ return (100*R/swl).toFixed(1) + "% of 10-t"; }
+  byId("U1").textContent = util(R1);
+  byId("U2").textContent = util(R2);
+  byId("U3").textContent = util(R3);
+  byId("U4").textContent = util(R4);
+
+  drawDiagram({L,B,DistQuay,X,Y,Lrun,Bproj});
+}
+
+/* ------------------------------ Diagram SVG ----------------------------- */
+function drawDiagram({L,B,DistQuay,X,Y,Lrun,Bproj}){
+  const svg = byId("viz"); svg.innerHTML = "";
+  // world -> screen scale
+  // fit barge + lines into viewBox (0..900 x 0..520)
+  const margin = {l:80,r:80,t:40,b:80};
+  const W = 900, H=520;
+  const spanX = (DistQuay + B + Math.max(Bproj[1],Bproj[2],Bproj[3],Bproj[4]) + 30);
+  const spanY = (Math.max(Y[3]+Lrun[3],Y[4]+Lrun[4]) + 30);
+  const sx = (W - margin.l - margin.r) / spanX;
+  const sy = (H - margin.t - margin.b) / spanY;
+  const s  = Math.min(sx, sy);
+
+  const ox = margin.l;               // origin (0,0) at left-bottom world
+  const oy = H - margin.b;
+
+  // helper world->screen
+  const Xs = x => ox + x*s;
+  const Ys = y => oy - y*s;
+
+  // Quay (y=0 baseline)
+  line(svg, Xs(-50), Ys(0), Xs(spanX+50), Ys(0), {w:3});
+  text(svg, Xs(5), Ys(0)+14, "QUAY", {fill:"#555"});
+
+  // Barge rectangle at distance DistQuay from quay, spanning breadth B (±B/2) and length L (0..L)
+  const bargeX = DistQuay;               // inner edge of hull from quay
+  const left = Xs(bargeX), right = Xs(bargeX + B);
+  const stern = Ys(0), bow = Ys(L);
+
+  const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+  rect.setAttribute("x",left); rect.setAttribute("y",bow);
+  rect.setAttribute("width", (right-left)); rect.setAttribute("height",(stern-bow));
+  rect.setAttribute("fill","#f8fafc"); rect.setAttribute("stroke","#0f172a"); rect.setAttribute("stroke-width","2");
+  rect.setAttribute("rx","6"); svg.appendChild(rect);
+  text(svg,(left+right)/2-20,(bow+stern)/2,"BARGE",{fill:"#0f172a"});
+
+  // CL barge dashed
+  line(svg,(left+right)/2, bow, (left+right)/2, stern, {dash:"6 6", stroke:"#64748b"});
+
+  // Bollard points on barge (assume X is offset from CL to starboard; draw both sides symmetrical around CL)
+  const CLx = bargeX + B/2;
+
+  const boll = [
+    {i:1, x:CLx + X[1], y:Y[1]},
+    {i:2, x:CLx - X[2], y:Y[2]},
+    {i:3, x:CLx + X[3], y:Y[3]},
+    {i:4, x:CLx - X[4], y:Y[4]},
+  ];
+  boll.forEach(b=>{
+    circle(svg, Xs(b.x), Ys(b.y), 5, {fill:"#fff"});
+    text(svg, Xs(b.x)+8, Ys(b.y)-6, `B${b.i}`);
+  });
+
+  // Quay mooring points:
+  // 1 & 3 to port (−X), 2 & 4 to stbd (+X).
+  const qPts = [
+    null,
+    {x: (bargeX) - Bproj[1], y: Y[1] - Lrun[1]},
+    {x: (bargeX + B) + Bproj[2], y: Y[2] - Lrun[2]},
+    {x: (bargeX) - Bproj[3], y: Y[3] + Lrun[3]},
+    {x: (bargeX + B) + Bproj[4], y: Y[4] + Lrun[4]},
+  ];
+
+  // Lines and quay points
+  [1,2,3,4].forEach(i=>{
+    const p1 = boll[i-1]; const p2 = qPts[i];
+    line(svg, Xs(p1.x), Ys(p1.y), Xs(p2.x), Ys(p2.y), {stroke:"#0ea5e9", w:2});
+    circle(svg, Xs(p2.x), Ys(p2.y), 4, {fill:"#0ea5e9", stroke:"#0369a1"});
+    text(svg, Xs(p2.x)+6, Ys(p2.y)-6, `Reaction ${i}`, {fill:"#0ea5e9"});
+  });
+}
+
+/* ------------------------------- Wiring -------------------------------- */
+function wireInputs(){
+  document.querySelectorAll("input,select").forEach(el => {
+    el.addEventListener("input", calc);
+    el.addEventListener("change", calc);
+  });
+  byId("printBtn").addEventListener("click", ()=>window.print());
+
+  // Help modal events
+  const modal = byId("helpModal");
+  byId("helpBtn").addEventListener("click", ()=>{ modal.classList.remove("hidden"); modal.classList.add("flex"); });
+  byId("helpClose").addEventListener("click", ()=>{ modal.classList.add("hidden"); modal.classList.remove("flex"); });
+  modal.addEventListener("click", (e)=>{ if(e.target===modal){ modal.classList.add("hidden"); modal.classList.remove("flex"); }});
+}
+wireInputs();
+calc();
+</script>
+</body>
+</html>
